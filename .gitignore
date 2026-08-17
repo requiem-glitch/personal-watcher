@@ -1,0 +1,5 @@
+*.prt
+*.exe
+*.out
+.env
+.vscode/
