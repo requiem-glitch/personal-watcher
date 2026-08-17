@@ -1,0 +1,9 @@
+CREATE TABLE watches (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    url TEXT NOT NULL,
+    expected_status INTEGER NOT NULL,
+    interval_seconds INTEGER NOT NULL CHECK (interval_seconds > 0),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

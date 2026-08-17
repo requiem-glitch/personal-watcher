@@ -9,12 +9,34 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/requiem-glitch/personal-watcher/internal/httpapi"
 )
 
 func main() {
 
-	ctx, stop := signal.NotifyContext(
+	/* POSTGRES BLOCK START */
+	dbURL, ok := os.LookupEnv("DATABASE_URL")
+	if !ok || dbURL == "" {
+		log.Fatal("DATABASE_URL NOT FOUND OR EMPTY")
+	}
+	pool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		log.Fatal(err, "POOL CREATING ERROR")
+	}
+	defer pool.Close()
+	pingCtx, cancel := context.WithTimeout(
+		context.Background(),
+		5*time.Second,
+	)
+	defer cancel()
+	err = pool.Ping(pingCtx)
+	if err != nil {
+		log.Fatal("POOL PING ERROR")
+	}
+	/* POSTGRES BLOCK END */
+
+	appCtx, stop := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
 		syscall.SIGTERM,
@@ -38,7 +60,7 @@ func main() {
 		}
 	}()
 
-	<-ctx.Done()
+	<-appCtx.Done()
 	log.Println("ctrl+c found")
 
 	shutdownCtx, cancel := context.WithTimeout(
@@ -46,7 +68,7 @@ func main() {
 		5*time.Second,
 	)
 	defer cancel()
-	err := server.Shutdown(shutdownCtx)
+	err = server.Shutdown(shutdownCtx)
 	if err != nil {
 		log.Fatal(err)
 	}
