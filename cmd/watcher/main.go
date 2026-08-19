@@ -50,7 +50,7 @@ func main() {
 		server.Addr = ":8080"
 	}
 
-	mux := httpapi.NewMux()
+	mux := httpapi.NewMux(httpapi.Handler{Pool: pool})
 	server.Handler = mux
 
 	go func() {
