@@ -27,7 +27,15 @@ type Watch struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
-func (h Handler) createWatchHandler(resp http.ResponseWriter, req *http.Request) {
+func parseWatchID(req *http.Request) (int64, error) {
+	num, err := strconv.ParseInt(req.PathValue("id"), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return num, nil
+}
+
+func (h Handler) watchesHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 
 	switch req.Method {
@@ -74,7 +82,6 @@ func (h Handler) createWatchHandler(resp http.ResponseWriter, req *http.Request)
 			err = encoder.Encode(currentReq)
 			if err != nil {
 				log.Printf("encode response: %v", err)
-				resp.WriteHeader(http.StatusInternalServerError) //useless
 				return
 			}
 
@@ -106,7 +113,7 @@ func (h Handler) createWatchHandler(resp http.ResponseWriter, req *http.Request)
 				encoder := json.NewEncoder(resp)
 				for getting.Next() {
 					var currentRow Watch
-					err = getting.Scan( // err???
+					err = getting.Scan(
 						&currentRow.ID,
 						&currentRow.URL,
 						&currentRow.ExpectedStatus,
@@ -132,13 +139,12 @@ func (h Handler) createWatchHandler(resp http.ResponseWriter, req *http.Request)
 				err = encoder.Encode(rows) // set statusOk auto
 				if err != nil {
 					log.Printf("encode rows: %v", err)
-					resp.WriteHeader(http.StatusInternalServerError) //useless
 					return
 				}
 				return
 			} else {
 				/*/watches/{id}*/
-				rowId, err := strconv.ParseInt(req.PathValue("id"), 10, 64) //cause ID is BIGINT
+				rowId, err := parseWatchID(req)
 				if err != nil {
 					log.Printf("convert ascii to int: %v", err)
 					resp.WriteHeader(http.StatusBadRequest)
@@ -166,7 +172,7 @@ func (h Handler) createWatchHandler(resp http.ResponseWriter, req *http.Request)
 					rowId,
 				)
 				var currentRow Watch
-				err = getting.Scan( // err???
+				err = getting.Scan(
 					&currentRow.ID,
 					&currentRow.URL,
 					&currentRow.ExpectedStatus,
@@ -190,7 +196,6 @@ func (h Handler) createWatchHandler(resp http.ResponseWriter, req *http.Request)
 				err = encoder.Encode(currentRow)
 				if err != nil {
 					log.Printf("encode row: %v", err)
-					resp.WriteHeader(http.StatusInternalServerError) //useless
 					return
 				}
 				return
@@ -199,7 +204,41 @@ func (h Handler) createWatchHandler(resp http.ResponseWriter, req *http.Request)
 		}
 	case http.MethodDelete:
 		{
-
+			rowId, err := parseWatchID(req)
+			if err != nil {
+				log.Printf("convert ascii to int: %v", err)
+				resp.WriteHeader(http.StatusBadRequest)
+				resp.Write([]byte(`{"error":"ID must be numeric"}`))
+				return
+			}
+			if rowId <= 0 {
+				log.Printf("convert ascii to row: row ID less than 1")
+				resp.WriteHeader(http.StatusBadRequest)
+				resp.Write([]byte(`{"error":"ID must be greater than 0"}`))
+				return
+			}
+			deleting, err := h.Pool.Exec(
+				req.Context(),
+				`DELETE
+				FROM watches
+				WHERE id = $1;`,
+				rowId,
+			)
+			if err != nil {
+				log.Printf("delete item: %v", err)
+				resp.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			cnt := deleting.RowsAffected()
+			if cnt == 0 {
+				log.Printf("delete item: item not found")
+				resp.WriteHeader(http.StatusNotFound)
+				resp.Write([]byte(`{"error":"item not found"}`))
+				return
+			}
+			log.Printf("delete item: 1 item deleted")
+			resp.WriteHeader(http.StatusNoContent)
+			return
 		}
 	default:
 		{

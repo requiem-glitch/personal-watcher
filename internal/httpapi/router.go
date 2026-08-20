@@ -14,7 +14,7 @@ func NewMux(h Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", healthHandler)
-	mux.HandleFunc("/watches", h.createWatchHandler)
-	mux.HandleFunc("/watches/{id}", h.createWatchHandler)
+	mux.HandleFunc("/watches", h.watchesHandler)
+	mux.HandleFunc("/watches/{id}", h.watchesHandler)
 	return mux
 }
