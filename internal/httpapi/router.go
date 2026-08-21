@@ -3,11 +3,11 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/requiem-glitch/personal-watcher/internal/postgres"
 )
 
 type Handler struct {
-	Pool *pgxpool.Pool
+	Repo postgres.Repository
 }
 
 func NewMux(h Handler) http.Handler {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/requiem-glitch/personal-watcher/internal/httpapi"
+	"github.com/requiem-glitch/personal-watcher/internal/postgres"
 )
 
 func main() {
@@ -50,7 +51,9 @@ func main() {
 		server.Addr = ":8080"
 	}
 
-	mux := httpapi.NewMux(httpapi.Handler{Pool: pool})
+	repo := postgres.Repository{Pool: pool}
+
+	mux := httpapi.NewMux(httpapi.Handler{Repo: repo})
 	server.Handler = mux
 
 	go func() {
