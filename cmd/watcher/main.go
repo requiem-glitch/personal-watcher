@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/requiem-glitch/personal-watcher/internal/checker"
 	"github.com/requiem-glitch/personal-watcher/internal/httpapi"
 	"github.com/requiem-glitch/personal-watcher/internal/postgres"
 )
@@ -63,6 +64,26 @@ func main() {
 		}
 	}()
 
+	/*checker test START*/
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	siteChecker := checker.Checker{
+		Client: client,
+	}
+	toCheck, err := repo.GetWatch(appCtx, 3)
+	if err != nil {
+		log.Printf("GetWatch: %v", err)
+		return
+	}
+	result := siteChecker.Check(appCtx, toCheck)
+	err = repo.SaveCheck(appCtx, result)
+	if err != nil {
+		log.Printf("SaveCheck: %v", err)
+		return
+	}
+	log.Printf("%+v", result)
+	/*checker test FINISH*/
 	<-appCtx.Done()
 	log.Println("ctrl+c found")
 

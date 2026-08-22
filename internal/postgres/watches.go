@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/requiem-glitch/personal-watcher/internal/checker"
 	"github.com/requiem-glitch/personal-watcher/internal/watch"
 )
 
@@ -128,4 +129,33 @@ func (r Repository) DeleteWatch(ctx context.Context, id int64) (int64, error) {
 		return 0, err
 	}
 	return deleting.RowsAffected(), nil
+}
+
+func (r Repository) SaveCheck(ctx context.Context, result checker.Result) error {
+	var statusCode, errText any
+	if result.StatusCode != 0 {
+		statusCode = result.StatusCode
+	} else {
+		statusCode = nil
+	}
+	if result.Err != nil {
+		errText = result.Err.Error()
+	} else {
+		errText = nil
+	}
+	_, err := r.Pool.Exec(
+		ctx,
+		`INSERT INTO checks (
+			watch_id,
+			status_code,
+			duration_ms,
+			error
+		)
+		VALUES ($1, $2, $3, $4);`,
+		result.WatchID,
+		statusCode,
+		result.Duration.Milliseconds(),
+		errText,
+	)
+	return err
 }

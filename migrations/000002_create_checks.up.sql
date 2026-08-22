@@ -1,0 +1,8 @@
+CREATE TABLE checks (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    watch_id BIGINT NOT NULL REFERENCES watches(id) ON DELETE CASCADE,
+    status_code INTEGER,
+    duration_ms BIGINT NOT NULL,
+    error TEXT,
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
