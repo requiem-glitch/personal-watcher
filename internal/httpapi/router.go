@@ -16,5 +16,6 @@ func NewMux(h Handler) http.Handler {
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/watches", h.watchesHandler)
 	mux.HandleFunc("/watches/{id}", h.watchesHandler)
+	mux.HandleFunc("/watches/{id}/checks", h.watchChecksHandler)
 	return mux
 }

@@ -24,6 +24,12 @@ type CreateWatchRequest struct {
 	IntervalSec    int    `json:"interval_seconds"`
 }
 
+type UpdateWatchRequest struct {
+	ExpectedStatus *int  `json:"expected_status"`
+	IntervalSec    *int  `json:"interval_seconds"`
+	Enabled        *bool `json:"enabled"`
+}
+
 func (h Handler) watchesHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 
@@ -153,6 +159,62 @@ func (h Handler) watchesHandler(resp http.ResponseWriter, req *http.Request) {
 			resp.WriteHeader(http.StatusNoContent)
 			return
 		}
+	case http.MethodPatch:
+		decoder := json.NewDecoder(req.Body)
+		var input UpdateWatchRequest
+		err := decoder.Decode(&input)
+		if err != nil {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"cannot decode json or invalid json data"}`))
+			return
+		}
+		if input.ExpectedStatus != nil && (*input.ExpectedStatus < 100 || *input.ExpectedStatus > 599) {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"invalid ExpectedStatus"}`))
+			return
+		}
+		if input.IntervalSec != nil && *input.IntervalSec <= 0 {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"invalid IntervalSec"}`))
+			return
+		}
+		if input.IntervalSec == nil && input.ExpectedStatus == nil && input.Enabled == nil {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"nothing to update"}`))
+			return
+		}
+		wid, err := parseWatchID(req)
+		if err != nil {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"watch_id must be numeric"}`))
+			return
+		}
+		if wid <= 0 {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"watch_id must be greater than 0"}`))
+			return
+		}
+		params := watch.UpdateParams{
+			ExpectedStatus: input.ExpectedStatus,
+			IntervalSec:    input.IntervalSec,
+			Enabled:        input.Enabled,
+		}
+		result, err := h.Repo.UpdateWatch(req.Context(), wid, params)
+		if err == pgx.ErrNoRows {
+			resp.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			resp.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		encoder := json.NewEncoder(resp)
+		resp.WriteHeader(http.StatusOK)
+		err = encoder.Encode(result)
+		if err != nil {
+			log.Printf("encode updated watch: %v", err)
+		}
+
 	default:
 		{
 			//resp.Header().Set("Allow", "POST")
@@ -160,5 +222,36 @@ func (h Handler) watchesHandler(resp http.ResponseWriter, req *http.Request) {
 			resp.Write([]byte(`{"error":"method not allowed"}`))
 			return
 		}
+	}
+}
+
+func (h Handler) watchChecksHandler(resp http.ResponseWriter, req *http.Request) {
+	resp.Header().Set("Content-Type", "application/json")
+	if req.Method != http.MethodGet {
+		resp.Header().Set("Allow", "GET")
+		resp.WriteHeader(http.StatusMethodNotAllowed)
+		resp.Write([]byte(`{"error":"method not allowed"}`))
+		return
+	}
+	wid, err := parseWatchID(req)
+	if err != nil {
+		resp.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if wid <= 0 {
+		resp.WriteHeader(http.StatusBadRequest)
+		resp.Write([]byte(`{"error":"watch_id must be greater than 0"}`))
+		return
+	}
+	checks, err := h.Repo.ListChecks(req.Context(), wid)
+	if err != nil {
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	encoder := json.NewEncoder(resp)
+	resp.WriteHeader(http.StatusOK)
+	err = encoder.Encode(checks)
+	if err != nil {
+		log.Printf("encode checks: %v", err)
 	}
 }

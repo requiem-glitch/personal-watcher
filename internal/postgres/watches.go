@@ -231,3 +231,82 @@ func (r Repository) GetLastHealth(ctx context.Context, watchID int64) (healthy b
 	}
 	return healthy, true, nil
 }
+
+func (r Repository) ListChecks(ctx context.Context, watchID int64) ([]watch.Check, error) {
+	rows, err := r.Pool.Query(
+		ctx,
+		`SELECT
+			id,
+			watch_id,
+			status_code,
+			duration_ms,
+			error,
+			healthy,
+			checked_at
+		 FROM checks
+		 WHERE watch_id = $1
+		 ORDER BY checked_at DESC;`,
+		watchID,
+	)
+	if err != nil {
+		return []watch.Check{}, err
+	}
+	defer rows.Close()
+	result := []watch.Check{}
+	for rows.Next() {
+		var row watch.Check
+		err = rows.Scan(&row.ID, &row.WatchID, &row.StatusCode, &row.DurationMS, &row.Error, &row.Healthy, &row.CheckedAt)
+		if err != nil {
+			return []watch.Check{}, err
+		}
+		result = append(result, row)
+	}
+	if rows.Err() != nil {
+		return []watch.Check{}, rows.Err()
+	}
+	return result, nil
+}
+
+func (r Repository) UpdateWatch(ctx context.Context, id int64, params watch.UpdateParams) (watch.Watch, error) {
+	row := r.Pool.QueryRow(
+		ctx,
+		`UPDATE watches
+		 SET
+		 	expected_status = COALESCE($2, expected_status),
+		 	interval_seconds = COALESCE($3, interval_seconds),
+		 	enabled = COALESCE($4, enabled),
+		 	updated_at = NOW()
+		  WHERE id = $1
+		  RETURNING
+		  	id,
+			url,
+			expected_status,
+			interval_seconds,
+			enabled,
+			created_at,
+			updated_at;`,
+		id,
+		params.ExpectedStatus,
+		params.IntervalSec,
+		params.Enabled,
+	)
+	var result watch.Watch
+	err := row.Scan(
+		&result.ID,
+		&result.URL,
+		&result.ExpectedStatus,
+		&result.IntervalSec,
+		&result.Enabled,
+		&result.CreatedAt,
+		&result.UpdatedAt,
+	)
+
+	if err == pgx.ErrNoRows {
+		return watch.Watch{}, pgx.ErrNoRows
+	}
+	if err != nil {
+		return watch.Watch{}, err
+	}
+	return result, nil
+
+}
