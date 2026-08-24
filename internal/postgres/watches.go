@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/requiem-glitch/personal-watcher/internal/checker"
 	"github.com/requiem-glitch/personal-watcher/internal/watch"
@@ -149,13 +150,15 @@ func (r Repository) SaveCheck(ctx context.Context, result checker.Result) error 
 			watch_id,
 			status_code,
 			duration_ms,
-			error
+			error,
+			healthy
 		)
-		VALUES ($1, $2, $3, $4);`,
+		VALUES ($1, $2, $3, $4, $5);`,
 		result.WatchID,
 		statusCode,
 		result.Duration.Milliseconds(),
 		errText,
+		result.Healthy,
 	)
 	return err
 }
@@ -207,4 +210,24 @@ func (r Repository) ListDueWatches(ctx context.Context) ([]watch.Watch, error) {
 		return []watch.Watch{}, rows.Err()
 	}
 	return readyToCheck, nil
+}
+
+func (r Repository) GetLastHealth(ctx context.Context, watchID int64) (healthy bool, found bool, err error) {
+	row := r.Pool.QueryRow(
+		ctx,
+		`SELECT healthy
+		 FROM checks
+		 WHERE watch_id = $1
+		 ORDER BY checked_at DESC
+		 LIMIT 1;`,
+		watchID,
+	)
+	err = row.Scan(&healthy)
+	if err == pgx.ErrNoRows {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, err
+	}
+	return healthy, true, nil
 }

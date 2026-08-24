@@ -18,13 +18,14 @@ type Result struct {
 	StatusCode int
 	Duration   time.Duration
 	Err        error
+	Healthy    bool
 }
 
 func (c Checker) Check(ctx context.Context, w watch.Watch) Result {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.URL, nil)
 	if err != nil {
 		log.Printf("NewRequestWithContext: %v", err)
-		return Result{WatchID: w.ID, Err: err}
+		return Result{WatchID: w.ID, Err: err, Healthy: false}
 	}
 	startTime := time.Now()
 
@@ -32,7 +33,7 @@ func (c Checker) Check(ctx context.Context, w watch.Watch) Result {
 	duration := time.Since(startTime)
 	if err != nil {
 		log.Printf("Client.Do: %v", err)
-		return Result{WatchID: w.ID, Duration: duration, Err: err}
+		return Result{WatchID: w.ID, Duration: duration, Err: err, Healthy: false}
 	}
 	defer resp.Body.Close()
 	return Result{
@@ -40,5 +41,6 @@ func (c Checker) Check(ctx context.Context, w watch.Watch) Result {
 		StatusCode: resp.StatusCode,
 		Duration:   duration,
 		Err:        nil,
+		Healthy:    (resp.StatusCode == w.ExpectedStatus),
 	}
 }

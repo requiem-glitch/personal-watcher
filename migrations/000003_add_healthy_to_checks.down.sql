@@ -1,0 +1,2 @@
+ALTER TABLE checks
+DROP COLUMN healthy;

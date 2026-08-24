@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/requiem-glitch/personal-watcher/internal/checker"
 	"github.com/requiem-glitch/personal-watcher/internal/httpapi"
+	"github.com/requiem-glitch/personal-watcher/internal/notifier"
 	"github.com/requiem-glitch/personal-watcher/internal/postgres"
 	"github.com/requiem-glitch/personal-watcher/internal/scheduler"
 )
@@ -73,10 +74,24 @@ func main() {
 		Client: client,
 	}
 
+	tgAPI, exists := os.LookupEnv("TELEGRAM_BOT_TOKEN")
+	if !exists || tgAPI == "" {
+		log.Fatal("TELEGRAM_BOT_TOKEN NOT FOUND OR EMPTY")
+	}
+	tgChatID, exists := os.LookupEnv("TELEGRAM_CHAT_ID")
+	if !exists || tgChatID == "" {
+		log.Fatal("TELEGRAM_CHAT_ID NOT FOUND OR EMPTY")
+	}
+	telegramNotifier := notifier.TelegramNotifier{
+		Token:  tgAPI,
+		ChatID: tgChatID,
+		Client: client,
+	}
 	siteScheduler := scheduler.Scheduler{
-		Repo:    repo,
-		Checker: siteChecker,
-		Every:   5 * time.Second,
+		Repo:     repo,
+		Checker:  siteChecker,
+		Every:    5 * time.Second,
+		Notifier: telegramNotifier,
 	}
 
 	go siteScheduler.Run(appCtx)
