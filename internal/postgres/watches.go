@@ -159,3 +159,52 @@ func (r Repository) SaveCheck(ctx context.Context, result checker.Result) error 
 	)
 	return err
 }
+
+func (r Repository) ListDueWatches(ctx context.Context) ([]watch.Watch, error) {
+	rows, err := r.Pool.Query(
+		ctx,
+		`SELECT 
+			watches.id, 
+			watches.url, 
+			watches.expected_status, 
+			watches.interval_seconds, 
+			watches.enabled, 
+			watches.created_at, 
+			watches.updated_at
+		 FROM watches
+		 LEFT JOIN checks ON watches.id = checks.watch_id
+		 WHERE watches.enabled = TRUE
+		 GROUP BY watches.id
+		 HAVING
+		 	MAX(checks.checked_at) IS NULL
+			OR
+			MAX(checks.checked_at)
+				+ watches.interval_seconds * INTERVAL '1 second'
+				<= NOW();`,
+	)
+	if err != nil {
+		return []watch.Watch{}, err
+	}
+	defer rows.Close()
+	readyToCheck := []watch.Watch{}
+	for rows.Next() {
+		var currentRow watch.Watch
+		err = rows.Scan(
+			&currentRow.ID,
+			&currentRow.URL,
+			&currentRow.ExpectedStatus,
+			&currentRow.IntervalSec,
+			&currentRow.Enabled,
+			&currentRow.CreatedAt,
+			&currentRow.UpdatedAt,
+		)
+		if err != nil {
+			return []watch.Watch{}, err
+		}
+		readyToCheck = append(readyToCheck, currentRow)
+	}
+	if rows.Err() != nil {
+		return []watch.Watch{}, rows.Err()
+	}
+	return readyToCheck, nil
+}

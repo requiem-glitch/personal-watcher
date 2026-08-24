@@ -13,6 +13,7 @@ import (
 	"github.com/requiem-glitch/personal-watcher/internal/checker"
 	"github.com/requiem-glitch/personal-watcher/internal/httpapi"
 	"github.com/requiem-glitch/personal-watcher/internal/postgres"
+	"github.com/requiem-glitch/personal-watcher/internal/scheduler"
 )
 
 func main() {
@@ -64,26 +65,22 @@ func main() {
 		}
 	}()
 
-	/*checker test START*/
+	//Scheduler start
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 	siteChecker := checker.Checker{
 		Client: client,
 	}
-	toCheck, err := repo.GetWatch(appCtx, 3)
-	if err != nil {
-		log.Printf("GetWatch: %v", err)
-		return
+
+	siteScheduler := scheduler.Scheduler{
+		Repo:    repo,
+		Checker: siteChecker,
+		Every:   5 * time.Second,
 	}
-	result := siteChecker.Check(appCtx, toCheck)
-	err = repo.SaveCheck(appCtx, result)
-	if err != nil {
-		log.Printf("SaveCheck: %v", err)
-		return
-	}
-	log.Printf("%+v", result)
-	/*checker test FINISH*/
+
+	go siteScheduler.Run(appCtx)
+
 	<-appCtx.Done()
 	log.Println("ctrl+c found")
 
