@@ -15,6 +15,7 @@ import (
 	"github.com/requiem-glitch/personal-watcher/internal/notifier"
 	"github.com/requiem-glitch/personal-watcher/internal/postgres"
 	"github.com/requiem-glitch/personal-watcher/internal/scheduler"
+	"github.com/requiem-glitch/personal-watcher/internal/telegrambot"
 )
 
 func main() {
@@ -95,6 +96,19 @@ func main() {
 	}
 
 	go siteScheduler.Run(appCtx)
+
+	// TelegramBot START
+	botClient := &http.Client{
+		Timeout: 40 * time.Second,
+	}
+	bot := telegrambot.Bot{
+		Token:  tgAPI,
+		ChatID: tgChatID,
+		Client: botClient,
+		Repo:   repo,
+	}
+
+	go bot.Run(appCtx)
 
 	<-appCtx.Done()
 	log.Println("ctrl+c found")
