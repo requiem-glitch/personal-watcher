@@ -232,7 +232,7 @@ func (r Repository) GetLastHealth(ctx context.Context, watchID int64) (healthy b
 	return healthy, true, nil
 }
 
-func (r Repository) ListChecks(ctx context.Context, watchID int64) ([]watch.Check, error) {
+func (r Repository) ListChecks(ctx context.Context, watchID int64, limit, offset int) ([]watch.Check, error) {
 	rows, err := r.Pool.Query(
 		ctx,
 		`SELECT
@@ -245,8 +245,12 @@ func (r Repository) ListChecks(ctx context.Context, watchID int64) ([]watch.Chec
 			checked_at
 		 FROM checks
 		 WHERE watch_id = $1
-		 ORDER BY checked_at DESC;`,
+		 ORDER BY checked_at DESC
+		 LIMIT $2
+		 OFFSET $3;`,
 		watchID,
+		limit,
+		offset,
 	)
 	if err != nil {
 		return []watch.Check{}, err

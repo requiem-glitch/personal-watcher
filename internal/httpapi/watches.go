@@ -18,6 +18,14 @@ func parseWatchID(req *http.Request) (int64, error) {
 	return num, nil
 }
 
+func parseInt(str string) (int, error) {
+	num, err := strconv.Atoi(str)
+	if err != nil {
+		return 0, err
+	}
+	return num, nil
+}
+
 type CreateWatchRequest struct {
 	URL            string `json:"url"`
 	ExpectedStatus int    `json:"expected_status"`
@@ -243,7 +251,37 @@ func (h Handler) watchChecksHandler(resp http.ResponseWriter, req *http.Request)
 		resp.Write([]byte(`{"error":"watch_id must be greater than 0"}`))
 		return
 	}
-	checks, err := h.Repo.ListChecks(req.Context(), wid)
+
+	values := req.URL.Query()
+	limit, offset := 20, 0
+	limitS, offsetS := values.Get("limit"), values.Get("offset")
+	if limitS != "" {
+		limit, err = parseInt(limitS)
+		if err != nil {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"limit must be numeric"}`))
+			return
+		}
+		if limit <= 0 || limit > 100 {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"limit must be in interval 1..100"}`))
+			return
+		}
+	}
+	if offsetS != "" {
+		offset, err = parseInt(offsetS)
+		if err != nil {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"offset must be numeric"}`))
+			return
+		}
+		if offset < 0 {
+			resp.WriteHeader(http.StatusBadRequest)
+			resp.Write([]byte(`{"error":"offset must be greater or equal 0"}`))
+			return
+		}
+	}
+	checks, err := h.Repo.ListChecks(req.Context(), wid, limit, offset)
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
