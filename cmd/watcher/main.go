@@ -93,6 +93,7 @@ func main() {
 		Checker:  siteChecker,
 		Every:    5 * time.Second,
 		Notifier: telegramNotifier,
+		Workers:  5,
 	}
 
 	go siteScheduler.Run(appCtx)

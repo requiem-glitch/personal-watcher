@@ -209,6 +209,13 @@ func (b Bot) Run(ctx context.Context) {
 					}
 					replyStr := fmt.Sprintf("created watch id=%d", watch.ID)
 					b.reply(ctx, replyStr)
+				case "/help":
+					b.reply(ctx, `command list:
+					/list
+					/add <url> <expected_status> <interval_seconds>
+					/enable <id>
+					/disable <id>
+					/delete <id>`)
 				default:
 					b.reply(ctx, "unknown command")
 				}
